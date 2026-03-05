@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Arc Network - Transaction Confirmation Time & Cost Analyzer</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0a1628 0%, #1a2744 50%, #0a1628 100%);
+            min-height: 100vh;
+            color: #ffffff;
+            padding: 20px;
+            position: relative;
+            overflow-x: hidden;
+            cursor: none; /* Hide default cursor */
+        }
+
+        /* ===== SPACE BACKGROUND ANIMATION ===== */
+        .space-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -2;
+            background: 
+                radial-gradient(ellipse at 20% 80%, rgba(26, 39, 68, 0.8) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 20%, rgba(10, 22, 40, 0.8) 0%, transparent 50%),
+                linear-gradient(135deg, #0a1628 0%, #1a2744 50%, #0a1628 100%);
+            animation: spaceFlow 20s ease-in-out infinite;
+        }
+
+        @keyframes spaceFlow {
+            0%, 100% { background-position: 0% 50%, 100% 50%, 50% 50%; }
+            50% { background-position: 100% 50%, 0% 50%, 50% 50%; }
+        }
+
+        /* Stars */
+        .stars {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .star {
+            position: absolute;
+            background: #ffffff;
+            border-radius: 50%;
+            animation: twinkle 3s ease-in-out infinite;
+            opacity: 0.3;
+        }
+
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.2; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.2); }
+        }
+
+        /* ===== CUSTOM CURSOR ===== */
+        .custom-cursor {
+            position: fixed;
+            width: 24px;
+            height: 24px;
+            background-image: url('arc1.png');
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            pointer-events: none;
+            z-index: 10000;
+            transform: translate(-50%, -50%);
+            transition: transform 0.1s ease;
+        }
+
+        .custom-cursor.clicked {
+            animation: cursorPop 0.3s ease-out;
+        }
+
+        @keyframes cursorPop {
+            0% { transform: translate(-50%, -50%) scale(1); }
+            50% { transform: translate(-50%, -50%) scale(1.3); }
+            100% { transform: translate(-50%, -50%) scale(1); }
+        }
+
+        /* ===== CURSOR PARTICLE EFFECT ===== */
+        .cursor-particle {
+            position: fixed;
+            width: 24px;
+            height: 24px;
+            background-image: url('arc1.png');
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 1;
+            transform: translate(-50%, -50%);
+        }
+
+        @keyframes particleJump {
+            0% {
+                opacity: 1;
+                transform: translate(-50%, -50%) translate(0, 0) scale(1);
+            }
+            30% {
+                opacity: 0.9;
+                transform: translate(-50%, -50%) translate(var(--jump-x), -30px) scale(1.1);
+            }
+            70% {
+                opacity: 0.5;
+                transform: translate(-50%, -50%) translate(var(--jump-x), var(--fall-y)) scale(0.8);
+            }
+            100% {
+                opacity: 0;
+                transform: translate(-50%, -50%) translate(var(--jump-x), var(--fall-y)) scale(0.3);
+            }
+        }
+
+        /* ===== MAIN LAYOUT ===== */
+        .container { max-width: 900px; margin: 0 auto; padding-bottom: 60px; position: relative; z-index: 10; }
+        .header { text-align: center; margin-bottom: 40px; padding: 30px 0; }
+        .logo { width: 180px; height: auto; margin-bottom: 15px; }
+        .tagline { color: #8b92a8; font-size: 16px; margin-top: 10px; }
+        
+        .card { 
+            background: rgba(255, 255, 255, 0.03);
+            padding: 40px; 
+            border-radius: 20px; 
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 { color: #ffffff; font-size: 28px; margin-bottom: 10px; text-align: center; }
+        .subtitle { color: #8b92a8; text-align: center; margin-bottom: 30px; font-size: 14px; }
+        
+        .input-group { margin-bottom: 20px; }
+        label { display: block; color: #8b92a8; font-size: 13px; margin-bottom: 8px; text-transform: uppercase; }
+        
+        input { 
+            width: 100%; padding: 15px; border: 1px solid rgba(255, 255, 255, 0.1); 
+            border-radius: 10px; background: rgba(0, 0, 0, 0.3);
+            color: #ffffff; font-size: 15px;
+        }
+        input:focus { outline: none; border-color: #60a5fa; }
+        input::placeholder { color: #4b5563; }
+
+        button { 
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            color: white; border: none; padding: 16px 32px; border-radius: 10px; 
+            cursor: pointer; font-size: 16px; font-weight: 600; width: 100%;
+            transition: all 0.3s; margin-top: 10px;
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(59, 130, 246, 0.4); }
+        button:active { transform: translateY(0); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .loading { text-align: center; padding: 20px; color: #60a5fa; display: none; }
+        .error { color: #ef4444; margin-top: 15px; font-size: 14px; padding: 10px; background: rgba(239, 68, 68, 0.1); border-radius: 8px; display: none; }
+
+        .results-container { margin-top: 30px; display: none; }
+        .section-title { color: #8b92a8; font-size: 12px; text-transform: uppercase; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+
+        .comparison-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
+        .comparison-card { background: rgba(0, 0, 0, 0.3); padding: 25px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.05); }
+        .comparison-card.ethereum { border-left: 4px solid #627eea; }
+        .comparison-card.arc { border-left: 4px solid #3b82f6; background: rgba(59, 130, 246, 0.1); }
+
+        .card-label { font-size: 12px; color: #8b92a8; text-transform: uppercase; margin-bottom: 10px; }
+        .card-value { font-size: 28px; font-weight: 700; color: #ffffff; margin-bottom: 5px; }
+        .card-subvalue { font-size: 13px; color: #6b7280; }
+
+        .savings-section { background: linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 12px; padding: 25px; margin-top: 20px; }
+        .savings-title { color: #22c55e; font-size: 14px; font-weight: 600; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+        .savings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .savings-item { text-align: center; }
+        .savings-label { font-size: 12px; color: #8b92a8; margin-bottom: 8px; }
+        .savings-value { font-size: 32px; font-weight: 700; color: #22c55e; }
+        .savings-sub { font-size: 13px; color: #6b7280; margin-top: 5px; }
+
+        .info-note { background: rgba(96, 165, 250, 0.1); border-left: 4px solid #60a5fa; padding: 12px 15px; border-radius: 8px; margin-top: 20px; font-size: 12px; color: #93c5fd; line-height: 1.4; }
+
+        .designer-credit { position: fixed; bottom: 20px; right: 20px; color: #4b5563; font-size: 13px; font-weight: 500; z-index: 100; }
+
+        @media (max-width: 768px) {
+            .comparison-grid, .savings-grid { grid-template-columns: 1fr; }
+            .card { padding: 25px; }
+            .designer-credit { position: relative; bottom: auto; right: auto; text-align: center; margin-top: 30px; padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Space Background -->
+    <div class="space-bg"></div>
+    <div class="stars" id="stars"></div>
+    
+    <!-- Custom Cursor -->
+    <div class="custom-cursor" id="customCursor"></div>
+
+    <div class="container">
+        <div class="header">
+            <img src="logo.png" alt="Arc Network" class="logo" />
+            <p class="tagline">Transaction Confirmation Time & Cost Analyzer</p>
+        </div>
+        <div class="card">
+            <h1>What Will Arc Change?</h1>
+            <p class="subtitle">See how long you waited for transactions to confirm + potential savings on Arc</p>
+            <div class="input-group">
+                <label>EVM Wallet Address</label>
+                <input type="text" id="walletInput" placeholder="0x..." />
+            </div>
+            <button onclick="checkWallet()" id="analyzeBtn">Analyze Your Potential Save on Arc</button>
+            <div class="loading" id="loading">⏳ Fetching transaction data from blockchain...</div>
+            <div class="error" id="errorMsg"></div>
+            <div class="results-container" id="resultsArea">
+                <div class="section-title">📊 Ethereum Mainnet - Your Transactions</div>
+                <div class="comparison-grid">
+                    <div class="comparison-card ethereum">
+                        <div class="card-label">Total Gas Paid</div>
+                        <div class="card-value" id="ethGas">0 ETH</div>
+                        <div class="card-subvalue" id="ethGasUSD">$0</div>
+                    </div>
+                    <div class="comparison-card ethereum">
+                        <div class="card-label">Total Waiting Time</div>
+                        <div class="card-value" id="ethWaitTime">0 min</div>
+                        <div class="card-subvalue" id="ethTxCount">0 transactions</div>
+                    </div>
+                </div>
+                <div class="section-title">⚡ Arc Network - Estimated for Same Transactions</div>
+                <div class="comparison-grid">
+                    <div class="comparison-card arc">
+                        <div class="card-label">Estimated Gas Cost (USDC)</div>
+                        <div class="card-value" id="arcGas">$0.001</div>
+                        <div class="card-subvalue">Predictable fee</div>
+                    </div>
+                    <div class="comparison-card arc">
+                        <div class="card-label">Estimated Wait Time</div>
+                        <div class="card-value" id="arcWaitTime">0.5 sec</div>
+                        <div class="card-subvalue">Finality time</div>
+                    </div>
+                </div>
+                <div class="savings-section">
+                    <div class="savings-title">💰 Your Potential Savings with Arc</div>
+                    <div class="savings-grid">
+                        <div class="savings-item">
+                            <div class="savings-label">Money Saved</div>
+                            <div class="savings-value" id="savingsMoney">$0</div>
+                            <div class="savings-sub" id="savingsPercent">0% cheaper</div>
+                        </div>
+                        <div class="savings-item">
+                            <div class="savings-label">Time Saved</div>
+                            <div class="savings-value" id="savingsTime">0 min</div>
+                            <div class="savings-sub" id="savingsTimePercent">0% faster</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="info-note">
+                    💡 <strong>Wait time estimation:</strong> Based on gas price and Ethereum network era. Modern transactions (2024+) typically confirm in 12-36 seconds. Arc Network: predictable $0.001 gas fees with 0.5 second transaction finality.
+                </div>
+            </div>
+        </div>
+        <div class="designer-credit">designed by Katsuyusama</div>
+    </div>
+
+    <script>
+        // ===== CONFIG =====
+        const API_KEY = 'FCQ77DN7M9T9D7DN861DFUJX2YUBR2F1F2';
+        const API_BASE = 'https://api.etherscan.io/v2/api';
+        const CHAIN_ID = '1';
+        const EIP_1559_BLOCK = 12965000;
+        const DENCUN_BLOCK = 19426587;
+        const ARC_FIXED_GAS_USD = 0.001;
+        const ARC_FINALITY_SEC = 0.5;
+        const ETH_PRICE_USD = 3000;
+
+        // ===== SPACE BACKGROUND: Create Stars =====
+        function createStars() {
+            const starsContainer = document.getElementById('stars');
+            const starCount = 30; // Very few stars as requested
+            
+            for (let i = 0; i < starCount; i++) {
+                const star = document.createElement('div');
+                star.className = 'star';
+                
+                // Random position
+                const x = Math.random() * 100;
+                const y = Math.random() * 100;
+                
+                // Very small size (1-2px)
+                const size = Math.random() * 1.5 + 0.5;
+                
+                // Random animation delay
+                const delay = Math.random() * 3;
+                
+                star.style.left = `${x}%`;
+                star.style.top = `${y}%`;
+                star.style.width = `${size}px`;
+                star.style.height = `${size}px`;
+                star.style.animationDelay = `${delay}s`;
+                
+                starsContainer.appendChild(star);
+            }
+        }
+
+        // ===== CUSTOM CURSOR: Follow Mouse =====
+        const customCursor = document.getElementById('customCursor');
+        
+        document.addEventListener('mousemove', (e) => {
+            customCursor.style.left = `${e.clientX}px`;
+            customCursor.style.top = `${e.clientY}px`;
+        });
+
+        // Add click effect to cursor
+        document.addEventListener('click', (e) => {
+            // Pop animation on main cursor
+            customCursor.classList.add('clicked');
+            setTimeout(() => customCursor.classList.remove('clicked'), 300);
+            
+            // Create particle effect
+            createCursorParticle(e.clientX, e.clientY);
+        });
+
+        // ===== CURSOR PARTICLE EFFECT =====
+        function createCursorParticle(x, y) {
+            const particle = document.createElement('div');
+            particle.className = 'cursor-particle';
+            
+            // Random jump direction: left or right (-80px to +80px)
+            const jumpX = (Math.random() > 0.5 ? 1 : -1) * (Math.random() * 60 + 40);
+            
+            // Random fall distance: 100px to 300px down
+            const fallY = Math.random() * 200 + 100;
+            
+            // Random duration: 0.8s to 1.5s
+            const duration = Math.random() * 0.7 + 0.8;
+            
+            // Set CSS variables for animation
+            particle.style.setProperty('--jump-x', `${jumpX}px`);
+            particle.style.setProperty('--fall-y', `${fallY}px`);
+            particle.style.animation = `particleJump ${duration}s ease-out forwards`;
+            
+            // Position at click location
+            particle.style.left = `${x}px`;
+            particle.style.top = `${y}px`;
+            
+            document.body.appendChild(particle);
+            
+            // Remove particle after animation
+            setTimeout(() => particle.remove(), duration * 1000);
+        }
+
+        // ===== ETHEREUM WAIT TIME ESTIMATION =====
+        function estimateConfirmationTime(gasPriceWei, blockNumber) {
+            const gasPriceGwei = Number(gasPriceWei) / 1e9;
+            
+            if (blockNumber < EIP_1559_BLOCK) {
+                if (gasPriceGwei >= 200) return 15;
+                else if (gasPriceGwei >= 100) return 30;
+                else if (gasPriceGwei >= 50) return 60;
+                else if (gasPriceGwei >= 30) return 90;
+                else if (gasPriceGwei >= 20) return 120;
+                else return 180;
+            } else if (blockNumber < DENCUN_BLOCK) {
+                if (gasPriceGwei >= 100) return 15;
+                else if (gasPriceGwei >= 50) return 25;
+                else if (gasPriceGwei >= 30) return 35;
+                else if (gasPriceGwei >= 20) return 45;
+                else if (gasPriceGwei >= 10) return 60;
+                else return 90;
+            } else {
+                if (gasPriceGwei >= 5) return 12;
+                else if (gasPriceGwei >= 2) return 15;
+                else if (gasPriceGwei >= 1) return 18;
+                else if (gasPriceGwei >= 0.5) return 22;
+                else if (gasPriceGwei >= 0.2) return 26;
+                else if (gasPriceGwei >= 0.1) return 30;
+                else if (gasPriceGwei >= 0.05) return 34;
+                else return 36;
+            }
+        }
+
+        function formatTime(seconds) {
+            if (seconds < 60) return `${seconds} sec`;
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            if (mins < 60) return `${mins} min ${secs} sec`;
+            const hours = Math.floor(mins / 60);
+            return `${hours}h ${mins % 60}m`;
+        }
+
+        // ===== MAIN ANALYSIS FUNCTION =====
+        async function checkWallet() {
+            const address = document.getElementById('walletInput').value.trim();
+            const resultsArea = document.getElementById('resultsArea');
+            const errorMsg = document.getElementById('errorMsg');
+            const loading = document.getElementById('loading');
+            const btn = document.getElementById('analyzeBtn');
+
+            resultsArea.style.display = 'none';
+            errorMsg.style.display = 'none';
+            errorMsg.innerText = '';
+            
+            if(!API_KEY || API_KEY.length < 30) {
+                errorMsg.innerText = "❌ API Key not configured properly.";
+                errorMsg.style.display = 'block';
+                return;
+            }
+            if(address.length < 42 || !address.startsWith('0x')) {
+                errorMsg.innerText = "Please enter a valid EVM wallet address (starts with 0x)";
+                errorMsg.style.display = 'block';
+                return;
+            }
+
+            loading.style.display = 'block';
+            btn.disabled = true;
+            btn.innerText = 'Analyzing...';
+
+            try {
+                const url = `${API_BASE}?chainid=${CHAIN_ID}&module=account&action=txlist&address=${address}&startblock=0&endblock=99999999&page=1&offset=100&sort=desc&apikey=${API_KEY}`;
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if(data.status === "0") {
+                    if(data.result.includes("No transactions found")) {
+                        throw new Error("No transactions found. Try: 0x47ac0Fb4F2D84898e4D9E7b4DaB3C24507a6D503");
+                    }
+                    throw new Error("API Error: " + data.result);
+                }
+
+                const transactions = data.result;
+                if(transactions.length === 0) throw new Error("No transactions found.");
+
+                let totalGasWei = BigInt(0), totalWaitTimeSec = 0, successfulTxCount = 0;
+                let eraCounts = { pre: 0, eip1559: 0, modern: 0 };
+                
+                transactions.forEach(tx => {
+                    if(tx.isError === "0" && tx.txreceipt_status === "1") {
+                        const blockNumber = parseInt(tx.blockNumber);
+                        const gasWei = BigInt(tx.gasUsed) * BigInt(tx.gasPrice);
+                        totalGasWei += gasWei;
+                        const waitTimeSec = estimateConfirmationTime(tx.gasPrice, blockNumber);
+                        totalWaitTimeSec += waitTimeSec;
+                        
+                        if (blockNumber < EIP_1559_BLOCK) eraCounts.pre++;
+                        else if (blockNumber < DENCUN_BLOCK) eraCounts.eip1559++;
+                        else eraCounts.modern++;
+                        
+                        successfulTxCount++;
+                    }
+                });
+
+                if(successfulTxCount === 0) {
+                    successfulTxCount = transactions.length;
+                    transactions.forEach(tx => {
+                        const blockNumber = parseInt(tx.blockNumber);
+                        const gasWei = BigInt(tx.gasUsed) * BigInt(tx.gasPrice);
+                        totalGasWei += gasWei;
+                        totalWaitTimeSec += estimateConfirmationTime(tx.gasPrice, blockNumber);
+                        if (blockNumber < EIP_1559_BLOCK) eraCounts.pre++;
+                        else if (blockNumber < DENCUN_BLOCK) eraCounts.eip1559++;
+                        else eraCounts.modern++;
+                    });
+                }
+
+                const totalGasEth = Number(totalGasWei) / 1e18;
+                const totalGasUSD = totalGasEth * ETH_PRICE_USD;
+                const totalWaitMin = totalWaitTimeSec / 60;
+                
+                const arcTotalGasUSD = ARC_FIXED_GAS_USD * successfulTxCount;
+                const arcTotalWaitSec = successfulTxCount * ARC_FINALITY_SEC;
+
+                const moneySaved = totalGasUSD - arcTotalGasUSD;
+                const savingsPercent = totalGasUSD > 0 ? ((totalGasUSD - arcTotalGasUSD) / totalGasUSD * 100).toFixed(1) : 0;
+                const timeSavedMin = (totalWaitTimeSec - arcTotalWaitSec) / 60;
+                const timeSavedPercent = totalWaitTimeSec > 0 ? ((totalWaitTimeSec - arcTotalWaitSec) / totalWaitTimeSec * 100).toFixed(1) : 0;
+
+                document.getElementById('ethGas').innerText = `${totalGasEth.toFixed(6)} ETH`;
+                document.getElementById('ethGasUSD').innerText = `$${totalGasUSD.toFixed(2)}`;
+                document.getElementById('ethWaitTime').innerText = `${totalWaitMin.toFixed(1)} min`;
+                document.getElementById('ethTxCount').innerText = `${successfulTxCount} tx (${eraCounts.pre} pre + ${eraCounts.eip1559} eip1559 + ${eraCounts.modern} modern)`;
+                
+                document.getElementById('arcGas').innerText = `$${arcTotalGasUSD.toFixed(3)}`;
+                document.getElementById('arcWaitTime').innerText = `${arcTotalWaitSec.toFixed(1)} sec`;
+
+                document.getElementById('savingsMoney').innerText = `$${moneySaved.toFixed(2)}`;
+                document.getElementById('savingsPercent').innerText = `${savingsPercent}% cheaper`;
+                document.getElementById('savingsTime').innerText = `${Math.abs(timeSavedMin).toFixed(1)} min`;
+                document.getElementById('savingsTimePercent').innerText = `${timeSavedPercent}% faster`;
+
+                resultsArea.style.display = 'block';
+
+            } catch (err) {
+                console.error('Error:', err);
+                errorMsg.innerText = "Error: " + err.message;
+                errorMsg.style.display = 'block';
+            } finally {
+                loading.style.display = 'none';
+                btn.disabled = false;
+                btn.innerText = 'Analyze Your Potential Save on Arc';
+            }
+        }
+
+        // ===== INITIALIZATION =====
+        document.addEventListener('DOMContentLoaded', () => {
+            createStars();
+            
+            // Add click effect to button too
+            document.getElementById('analyzeBtn').addEventListener('click', (e) => {
+                // Create extra particles on button click
+                for(let i = 0; i < 3; i++) {
+                    setTimeout(() => {
+                        createCursorParticle(
+                            e.clientX + (Math.random() - 0.5) * 40,
+                            e.clientY + (Math.random() - 0.5) * 20
+                        );
+                    }, i * 50);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
